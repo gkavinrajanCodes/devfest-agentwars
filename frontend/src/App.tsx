@@ -40,15 +40,14 @@ interface OrderItem {
 }
 
 interface StepLog {
-  id: number;
+  id?: number;
   step_name: string;
-  tool_called: string;
-  status: 'SUCCESS' | 'FAILED' | 'RETRYING';
-  duration_ms: number;
+  tool_name: string;
+  status: 'SUCCESS' | 'FAILED' | 'RETRYING' | 'RECOVERED' | string;
+  elapsed_ms: number;
   input_payload?: any;
   output_payload?: any;
-  error_message?: string;
-  created_at: string;
+  timestamp?: string;
 }
 
 interface OrderDetail {
@@ -73,7 +72,9 @@ interface OrderDetail {
   created_at: string;
   updated_at: string;
   items: OrderItem[];
-  steps: StepLog[];
+  timeline: StepLog[];
+  report?: any;
+  verification?: any;
 }
 
 interface Scenario {
@@ -702,7 +703,7 @@ export default function App() {
 
                 <div className="pipeline-nodes-row">
                   {pipelineStages.map((stage, idx) => {
-                    const stepMatch = currentOrder.steps.find(s => s.step_name === stage.key);
+                    const stepMatch = (currentOrder.timeline || []).find(s => s.step_name === stage.key);
                     const isDone = !!stepMatch && stepMatch.status === 'SUCCESS';
                     const isFailed = !!stepMatch && stepMatch.status === 'FAILED';
                     const isRetrying = !!stepMatch && stepMatch.status === 'RETRYING';
@@ -798,23 +799,24 @@ export default function App() {
                 </div>
 
                 <div className="timeline-list">
-                  {currentOrder.steps.map((step, idx) => {
-                    const isExpanded = !!expandedPayloads[step.id];
+                  {(currentOrder.timeline || []).map((step, idx) => {
+                    const stepId = step.id ?? idx;
+                    const isExpanded = !!expandedPayloads[stepId];
                     const evidence = step.output_payload?.evidence;
 
                     return (
                       <div 
-                        key={step.id || idx} 
+                        key={stepId} 
                         className={`timeline-step ${step.status === 'SUCCESS' ? 'success' : step.status === 'FAILED' ? 'failed' : 'retrying'}`}
                       >
                         <div 
                           className="step-header"
-                          onClick={() => setExpandedPayloads(prev => ({ ...prev, [step.id]: !prev[step.id] }))}
+                          onClick={() => setExpandedPayloads(prev => ({ ...prev, [stepId]: !prev[stepId] }))}
                         >
                           <div className="step-main-info">
                             <span className="step-index-badge">{idx + 1}</span>
                             <span className="step-name">{step.step_name}</span>
-                            <span className="step-tool">{step.tool_called}</span>
+                            <span className="step-tool">{step.tool_name}</span>
                             {evidence && (
                               <span className="evidence-chip">
                                 <ShieldCheck size={11} />
@@ -824,7 +826,7 @@ export default function App() {
                           </div>
 
                           <div className="step-meta">
-                            <span>{step.duration_ms}ms</span>
+                            <span>{step.elapsed_ms}ms</span>
                             <span className={`badge ${step.status === 'SUCCESS' ? 'badge-emerald' : step.status === 'FAILED' ? 'badge-amber' : 'badge-blue'}`}>
                               {step.status}
                             </span>
