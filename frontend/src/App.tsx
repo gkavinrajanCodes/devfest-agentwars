@@ -968,7 +968,7 @@ export default function App() {
                         style={{ cursor: 'pointer' }}
                         title="Click to view execution timeline"
                       >
-                        <td style={{ fontFamily: 'var(--font-mono)' }}>{ord.id.slice(-8)}</td>
+                        <td style={{ fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{ord.id.replace('ORD-', '')}</td>
                         <td>{ord.destination_city}</td>
                         <td>{ord.carrier_name || 'N/A'}</td>
                         <td>
