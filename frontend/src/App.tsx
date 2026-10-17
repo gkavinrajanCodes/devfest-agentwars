@@ -126,6 +126,74 @@ interface Carrier {
   simulate_failure: boolean;
 }
 
+function renderFormattedMessage(text: string) {
+  if (!text) return null;
+  const lines = text.split('\n');
+
+  return lines.map((line, lineIdx) => {
+    const trimmed = line.trim();
+    const isBullet = trimmed.startsWith('* ') || trimmed.startsWith('- ') || trimmed.startsWith('• ');
+    const content = isBullet ? trimmed.substring(2) : line;
+
+    // Parse bold (**...**) and inline code (`...`)
+    const parts: (string | React.ReactNode)[] = [];
+    const regex = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(content.substring(lastIndex, match.index));
+      }
+      const token = match[0];
+      if (token.startsWith('**') && token.endsWith('**')) {
+        parts.push(
+          <strong key={`${lineIdx}-${match.index}`} style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>
+            {token.slice(2, -2)}
+          </strong>
+        );
+      } else if (token.startsWith('`') && token.endsWith('`')) {
+        parts.push(
+          <code
+            key={`${lineIdx}-${match.index}`}
+            style={{
+              background: 'rgba(0, 229, 255, 0.1)',
+              color: '#38bdf8',
+              padding: '1px 5px',
+              borderRadius: '4px',
+              fontFamily: 'monospace',
+              fontSize: '0.88em',
+              border: '1px solid rgba(56, 189, 248, 0.25)'
+            }}
+          >
+            {token.slice(1, -1)}
+          </code>
+        );
+      }
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < content.length) {
+      parts.push(content.substring(lastIndex));
+    }
+
+    if (isBullet) {
+      return (
+        <div key={lineIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', margin: '3px 0' }}>
+          <span style={{ color: 'var(--accent-cyan)', fontSize: '0.9em' }}>•</span>
+          <div style={{ flex: 1 }}>{parts.length > 0 ? parts : content}</div>
+        </div>
+      );
+    }
+
+    return (
+      <div key={lineIdx} style={{ minHeight: trimmed ? undefined : '0.4rem', marginBottom: trimmed ? '0.2rem' : '0' }}>
+        {parts.length > 0 ? parts : <span>&nbsp;</span>}
+      </div>
+    );
+  });
+}
+
 export default function App() {
   const [prompt, setPrompt] = useState<string>(
     'Ship 2 Industrial LiDAR Scanners and 1 Thermal Imaging Core to Chicago hub via express freight.'
@@ -767,7 +835,7 @@ export default function App() {
               )}
               {chatLog.map((m, i) => (
                 <div key={i} className={`chat-msg ${m.role}`}>
-                  <div>{m.text}</div>
+                  <div className="chat-msg-body">{renderFormattedMessage(m.text)}</div>
                   {m.meta && <div className="chat-meta">{m.meta}</div>}
                 </div>
               ))}

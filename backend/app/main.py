@@ -4,7 +4,9 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
-import os
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from app.database import init_db, seed_db, reset_demo_database, get_connection
 from app.models import (
@@ -62,8 +64,16 @@ def chat(req: ChatRequest):
         raise HTTPException(status_code=400, detail="Message is empty")
     return llm_agent.chat(req.message)
 
+@app.get("/api/health")
+def api_health():
+    return {"name": "Logistics Autopilot API", "status": "ONLINE", "version": "1.0.0"}
+
+
 @app.get("/")
 def read_root():
+    dist_index = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist" / "index.html"
+    if dist_index.exists():
+        return FileResponse(dist_index)
     return {"name": "Logistics Autopilot API", "status": "ONLINE", "version": "1.0.0"}
 
 @app.post("/api/shipments", response_model=OrderDetailResponse)
@@ -213,3 +223,18 @@ def get_demo_scenarios():
             "priority": "EXPRESS"
         }
     ]
+
+
+# Unified single-port deployment: serve frontend build if dist/ exists
+DIST_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if (DIST_DIR / "index.html").exists():
+    if (DIST_DIR / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="static_assets")
+
+    @app.get("/{full_path:path}")
+    def serve_frontend_spa(full_path: str):
+        target = DIST_DIR / full_path
+        if target.exists() and target.is_file():
+            return FileResponse(target)
+        return FileResponse(DIST_DIR / "index.html")
+

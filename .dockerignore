@@ -1,0 +1,15 @@
+.git
+.gitignore
+.env
+backend/.env
+backend/.venv
+frontend/node_modules
+frontend/dist
+backend/__pycache__
+backend/**/__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.coverage
+.system_generated
