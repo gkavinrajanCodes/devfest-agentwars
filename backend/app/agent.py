@@ -18,8 +18,8 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 if os.environ.get("GEMINI_API_KEY") and not os.environ.get("GOOGLE_API_KEY"):
     os.environ["GOOGLE_API_KEY"] = os.environ["GEMINI_API_KEY"]
 
-FAST_MODEL = os.environ.get("GEMINI_FAST_MODEL", "gemini-2.5-flash")
-PRO_MODEL = os.environ.get("GEMINI_PRO_MODEL", "gemini-2.5-pro")
+FAST_MODEL = os.environ.get("GEMINI_FAST_MODEL", "gemini-flash-latest")
+PRO_MODEL = os.environ.get("GEMINI_PRO_MODEL", "gemini-3.5-flash")
 LLM_TIMEOUT_S = float(os.environ.get("LLM_TIMEOUT_S", "30"))
 APP = "logistics_autopilot"
 

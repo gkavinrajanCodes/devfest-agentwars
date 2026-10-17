@@ -4,6 +4,9 @@ import os
 import json
 import urllib.parse
 import urllib.request
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 WAREHOUSE_ADDRESS = {"WH-EAST": "Newark, NJ, USA", "WH-WEST": "Oakland, CA, USA"}
 
@@ -26,6 +29,41 @@ def estimate_route(warehouse_id: str, destination_city: str) -> dict:
     key = os.environ.get("GOOGLE_MAPS_API_KEY")
     origin = WAREHOUSE_ADDRESS.get(warehouse_id, "Newark, NJ, USA")
     if key:
+        # 1. Try modern Google Maps Routes API v2
+        try:
+            url = "https://routes.googleapis.com/directions/v2:computeRoutes"
+            headers = {
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": key,
+                "X-Goog-FieldMask": "routes.duration,routes.distanceMeters"
+            }
+            body = json.dumps({
+                "origin": {"address": origin},
+                "destination": {"address": f"{destination_city}, USA"},
+                "travelMode": "DRIVE"
+            }).encode()
+            req = urllib.request.Request(url, data=body, headers=headers)
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.loads(resp.read().decode())
+            if "routes" in data and len(data["routes"]) > 0:
+                route = data["routes"][0]
+                km = round(route.get("distanceMeters", 0) / 1000.0, 1)
+                duration_str = route.get("duration", "0s").rstrip("s")
+                seconds = float(duration_str) if duration_str.isdigit() else 0.0
+                hours = round(seconds / 3600.0, 1)
+                return {
+                    "source": "google_maps_routes_v2",
+                    "simulated": False,
+                    "origin": origin,
+                    "destination": destination_city,
+                    "distance_km": km,
+                    "duration_hours": hours,
+                    "eta_days": _eta_days(km)
+                }
+        except Exception as e:
+            routes_err = str(e)
+
+        # 2. Try legacy Distance Matrix API
         try:
             qs = urllib.parse.urlencode({
                 "origins": origin, "destinations": f"{destination_city}, USA",
@@ -35,18 +73,25 @@ def estimate_route(warehouse_id: str, destination_city: str) -> dict:
                 f"https://maps.googleapis.com/maps/api/distancematrix/json?{qs}", timeout=6
             ) as resp:
                 data = json.loads(resp.read())
-            el = data["rows"][0]["elements"][0]
-            if el.get("status") == "OK":
-                km = el["distance"]["value"] / 1000
-                return {"source": "google_maps", "simulated": False, "origin": origin,
-                        "destination": destination_city, "distance_km": round(km, 1),
+            if "rows" in data and len(data["rows"]) > 0 and len(data["rows"][0].get("elements", [])) > 0:
+                el = data["rows"][0]["elements"][0]
+                if el.get("status") == "OK":
+                    km = el["distance"]["value"] / 1000
+                    return {
+                        "source": "google_maps_distance_matrix",
+                        "simulated": False,
+                        "origin": origin,
+                        "destination": destination_city,
+                        "distance_km": round(km, 1),
                         "duration_hours": round(el["duration"]["value"] / 3600, 1),
-                        "eta_days": _eta_days(km)}
-            reason = f"Maps element status {el.get('status')}: {data.get('error_message', '')}"
-        except Exception as exc:  # network, quota, bad key
+                        "eta_days": _eta_days(km)
+                    }
+            reason = f"Maps element status {data.get('status')}: {data.get('error_message', '')}"
+        except Exception as exc:
             reason = f"Maps call failed: {exc}"
     else:
         reason = "GOOGLE_MAPS_API_KEY not set"
+
     km = SIMULATED_KM.get(warehouse_id, {}).get(destination_city, 1500)
     return {"source": "simulated_table", "simulated": True, "fallback_reason": reason,
             "origin": origin, "destination": destination_city, "distance_km": km,
