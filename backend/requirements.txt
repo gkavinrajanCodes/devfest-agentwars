@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+mcp
+google-adk
+google-genai
+pytest
+httpx
